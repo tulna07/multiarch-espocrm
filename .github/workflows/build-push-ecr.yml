@@ -61,4 +61,4 @@ jobs:
           context: ./espocrm-docker-${{ matrix.version }}/fpm
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: public.ecr.aws/klb/aje-espocrm:php${{ steps.php-version.outputs.php }}-fpm-${{ matrix.version }}
+          tags: public.ecr.aws/klb/aje-espocrm:php${{ steps.php-version.outputs.php }}-fpm${{ matrix.version }}

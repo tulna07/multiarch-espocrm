@@ -83,6 +83,15 @@ RUN set -ex; \
     ; \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    nano \
+    iputils-ping \
+    dnsutils \
+    netcat-openbsd \
+    && apt-get clean
+
 # php.ini
 RUN { \
     echo 'expose_php = Off'; \

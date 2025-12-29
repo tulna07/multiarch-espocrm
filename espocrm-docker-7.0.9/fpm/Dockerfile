@@ -73,7 +73,12 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     dnsutils \
     netcat-openbsd \
-    && apt-get clean
+    telnet \
+    net-tools \
+    iproute2 \
+    traceroute \
+    curl \
+&& apt-get clean
 
 # php.ini
 RUN { \

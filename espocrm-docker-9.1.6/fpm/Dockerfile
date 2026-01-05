@@ -127,9 +127,9 @@ COPY ./docker-*.sh  /usr/local/bin/
 
 # Setup PDF service
 RUN mkdir -p /opt/pdf-service
-COPY ../pdf-service/index.php /opt/pdf-service/
-COPY ../pdf-service/setup.sh /opt/pdf-service/
-COPY ../pdf-service/pdf-service.service /opt/pdf-service/
+COPY ./pdf-service/index.php /opt/pdf-service/
+COPY ./pdf-service/setup.sh /opt/pdf-service/
+COPY ./pdf-service/pdf-service.service /opt/pdf-service/
 RUN chmod +x /opt/pdf-service/setup.sh && \
     /opt/pdf-service/setup.sh
 

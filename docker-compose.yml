@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for Authentik and Keycloak
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - internal
+
+  # Redis for Authentik
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    networks:
+      - internal
+
+  # Authentik Server
+  authentik-server:
+    image: ghcr.io/goauthentik/server:latest
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: changeme-secret-key-min-50-chars-authentik-production
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - internal
+
+  # Authentik Worker
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:latest
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: changeme-secret-key-min-50-chars-authentik-production
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - internal
+
+  # Keycloak
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - internal
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: postgres:5432
+      GF_DATABASE_NAME: grafana
+      GF_DATABASE_USER: grafana
+      GF_DATABASE_PASSWORD: grafana
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Authentik
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: <REPLACE_WITH_GRAFANA_CLIENT_ID>
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: <REPLACE_WITH_GRAFANA_CLIENT_SECRET>
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: http://localhost:9000/application/o/authorize/
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://authentik-server:9000/application/o/token/
+      GF_AUTH_GENERIC_OAUTH_API_URL: http://authentik-server:9000/application/o/userinfo/
+      GF_AUTH_SIGNOUT_REDIRECT_URL: http://localhost:9000/application/o/grafana/end-session/
+      GF_AUTH_OAUTH_AUTO_LOGIN: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - postgres
+      - authentik-server
+    networks:
+      - internal
+
+  # pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_AUTHENTICATION_SOURCES: "['oauth2', 'internal']"
+      PGADMIN_CONFIG_OAUTH2_AUTO_CREATE_USER: 'True'
+      PGADMIN_CONFIG_OAUTH2_NAME: Authentik
+      PGADMIN_CONFIG_OAUTH2_CLIENT_ID: <REPLACE_WITH_PGADMIN_CLIENT_ID>
+      PGADMIN_CONFIG_OAUTH2_CLIENT_SECRET: <REPLACE_WITH_PGADMIN_CLIENT_SECRET>
+      PGADMIN_CONFIG_OAUTH2_TOKEN_URL: http://authentik-server:9000/application/o/token/
+      PGADMIN_CONFIG_OAUTH2_AUTHORIZATION_URL: http://localhost:9000/application/o/authorize/
+      PGADMIN_CONFIG_OAUTH2_API_BASE_URL: http://authentik-server:9000/
+      PGADMIN_CONFIG_OAUTH2_USERINFO_ENDPOINT: application/o/userinfo/
+      PGADMIN_CONFIG_OAUTH2_SCOPE: openid email profile
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+      - authentik-server
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  authentik_media:
+  authentik_templates:
+  grafana_data:
+  pgadmin_data:
